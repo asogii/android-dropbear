@@ -4,6 +4,9 @@
 #
 # SPDX-License-Identifier: MIT
 
+ANDROID_NDK_HOME=$ANDROID_HOME/ndk/30.0.14904198
+TARGET=aarch64-linux-android
+
 if [ -z "$ANDROID_NDK_HOME" ]; then
     echo "ANDROID_NDK_HOME is not set" >&2
     exit 1

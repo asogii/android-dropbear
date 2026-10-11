@@ -27,3 +27,10 @@
     #error "USE_DEV_PTMX define no longer needed as openpty() is now available"
 #endif
 #define USE_DEV_PTMX 1
+
+#define DEFAULT_PATH "/data/adb/dropbear/bin:/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin"
+
+#define DEFAULT_ROOT_PATH "/data/adb/dropbear/bin:/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin"
+
+#define SFTPSERVER_PATH "/data/data/com.termux/files/usr/libexec/sftp-server"
+

@@ -1,0 +1,12 @@
+diff --git a/src/svr-authpubkey.c b/src/svr-authpubkey.c
+--- a/src/svr-authpubkey.c
++++ b/src/svr-authpubkey.c
+@@ -504,7 +504,7 @@ static int checkpubkey(const char* keyalgo, unsigned int keyalgolen,
+ 	}
+ #endif
+ 	/* check file permissions, also whether file exists */
+-	if (checkpubkeyperms() == DROPBEAR_FAILURE) {
++	if (0 && checkpubkeyperms() == DROPBEAR_FAILURE) {
+ 		TRACE(("bad authorized_keys permissions, or file doesn't exist"))
+ 	} else {
+ 		int fd;
