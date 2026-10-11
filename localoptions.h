@@ -14,23 +14,20 @@
 #define DROPBEAR_SMALL_CODE 0
 
 // Build all but the most verbose level of trace messages into the binaries
-#define DEBUG_TRACE 4
+#define DEBUG_TRACE 0
 
-// Include non-standard shell path prior to Android 11 in default shell list
-#if __ANDROID_MIN_SDK_VERSION__ > 30
-    #error "COMPAT_USER_SHELLS override no longer needed"
-#endif
-#define COMPAT_USER_SHELLS "/bin/sh","/system/bin/sh"
-
-// Enable use of /dev/ptmx until openpty() is available
-#if __ANDROID_MIN_SDK_VERSION__ >= 23
-    #error "USE_DEV_PTMX define no longer needed as openpty() is now available"
-#endif
-#define USE_DEV_PTMX 1
-
+// Path
 #define DEFAULT_PATH "/data/adb/dropbear/bin:/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin"
-
 #define DEFAULT_ROOT_PATH "/data/adb/dropbear/bin:/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin"
 
 #define SFTPSERVER_PATH "/data/data/com.termux/files/usr/libexec/sftp-server"
+
+#define DROPBEAR_PIDFILE "/data/adb/dropbear/dropbear.pid"
+#define ED25519_PRIV_FILENAME "/data/adb/dropbear/dropbear_ed25519_host_key"
+
+// Network speed
+#define DEFAULT_RECV_WINDOW 262144
+
+#define DO_MOTD 0
+#define DROPBEAR_REEXEC 0
 
