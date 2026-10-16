@@ -1,0 +1,24 @@
+diff --git a/src/common-session.c b/src/common-session.c
+--- a/src/common-session.c
++++ b/src/common-session.c
+@@ -671,7 +671,7 @@ void fill_passwd(const char* username) {
+ 	ses.authstate.pw_uid = pw->pw_uid;
+ 	ses.authstate.pw_gid = pw->pw_gid;
+ 	ses.authstate.pw_name = m_strdup(pw->pw_name);
+-	ses.authstate.pw_dir = m_strdup(pw->pw_dir);
++	ses.authstate.pw_dir = m_strdup("/data/adb/dropbear/home");
+ 	ses.authstate.pw_shell = m_strdup(pw->pw_shell);
+ 	{
+ 		char *passwd_crypt = pw->pw_passwd;
+diff --git a/src/svr-authpubkey.c b/src/svr-authpubkey.c
+--- a/src/svr-authpubkey.c
++++ b/src/svr-authpubkey.c
+@@ -504,7 +504,7 @@ static int checkpubkey(const char* keyalgo, unsigned int keyalgolen,
+ 	}
+ #endif
+ 	/* check file permissions, also whether file exists */
+-	if (checkpubkeyperms() == DROPBEAR_FAILURE) {
++	if (0 && checkpubkeyperms() == DROPBEAR_FAILURE) {
+ 		TRACE(("bad authorized_keys permissions, or file doesn't exist"))
+ 	} else {
+ 		int fd;
