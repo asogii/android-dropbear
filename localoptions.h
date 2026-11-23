@@ -17,13 +17,13 @@
 #define DEBUG_TRACE 0
 
 // Path
-#define DEFAULT_PATH "/data/adb/dropbear/home/.local/bin:/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin"
-#define DEFAULT_ROOT_PATH "/data/adb/dropbear/home/.local/bin:/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin"
+#define DEFAULT_PATH "/data/adb/home/.local/bin:/data/adb/modules/dropbear_ssh/bin:/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin"
+#define DEFAULT_ROOT_PATH "/data/adb/home/.local/bin:/data/adb/modules/dropbear_ssh/bin:/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin"
 
 #define SFTPSERVER_PATH "/data/data/com.termux/files/usr/libexec/sftp-server"
 
-#define DROPBEAR_PIDFILE "/data/adb/dropbear/dropbear.pid"
-#define ED25519_PRIV_FILENAME "/data/adb/dropbear/dropbear_ed25519_host_key"
+#define DROPBEAR_PIDFILE "/dev/dropbear.pid"
+#define ED25519_PRIV_FILENAME "/data/adb/modules/dropbear_ssh/dropbear_ed25519_host_key"
 
 #define DROPBEAR_DEFPORT "2222"
 
@@ -32,4 +32,3 @@
 
 #define DO_MOTD 0
 #define DROPBEAR_REEXEC 0
-

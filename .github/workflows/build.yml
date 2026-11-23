@@ -1,219 +1,70 @@
----
-# Copyright © 2020-2026 Matt Robinson
-#
-# SPDX-License-Identifier: MIT
+name: Build Dropbear KSU Module
 
-name: Build
 on:
-  push:
-    branches-ignore:
-      - dependabot/**
-  pull_request:
-  schedule:
-    - cron: '30 12 * * 5'
-
-permissions:
-  contents: read
+  workflow_dispatch:
 
 jobs:
-  compile:
-    name: Compile
+  build:
     runs-on: ubuntu-latest
-    if: github.event_name != 'push' ||
-        github.ref != 'refs/heads/update-version' ||
-        github.event.head_commit.committer.name == 'github-actions[bot]'
-    strategy:
-      matrix:
-        target:
-          - armv7a-linux-androideabi
-          - aarch64-linux-android
-          - i686-linux-android
-          - x86_64-linux-android
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
 
-      - name: Build script
+      - name: Install NDK 30.0.14904198
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;30.0.14904198" >/dev/null
+
+      - name: Build Dropbear Binaries
         run: |
-          ndk="$($ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-                 --list_installed | sed -E 's/( +[|] +)/|/g;s/ +$//' | \
-                 grep '^  ndk' | cut -d '|' -f 4 | sort | head -n1)"
-          ANDROID_NDK_HOME="$ANDROID_HOME/$ndk" ./build
-        env:
-          TARGET: ${{ matrix.target }}
+          chmod +x build
+          ./build
 
-      - name: Collect binaries and build info
+      - name: Package KernelSU Module ZIP
         run: |
-          mkdir output
-          cp dropbear/dropbear output
-          cp dropbear/dbclient output
-          cp dropbear/dropbearkey output
-          cp dropbear/dropbearconvert output
-          cp dropbear/scp output
-          cp dropbear/LICENSE output/LICENSE.txt
+          VER=$(cat dropbear-version)
+          mkdir -p module/bin
+          cp dropbear/dropbear dropbear/dbclient dropbear/dropbearkey dropbear/dropbearconvert dropbear/scp module/bin/
 
-      - name: Upload binaries as artifact
-        uses: actions/upload-artifact@v7
+          cat << EOF > module/module.prop
+          id=dropbear_ssh
+          name=Dropbear SSH Server
+          version=$VER
+          versionCode=1
+          author=asogii
+          description=Dropbear SSH server and client tools ($VER) for Android 16
+          EOF
+
+          cat << 'EOF' > module/customize.sh
+          MODID="dropbear_ssh"
+          OLD_MOD="/data/adb/modules/$MODID"
+          HOME_DIR="/data/adb/home"
+
+          pkill -x dropbear >/dev/null 2>&1 || true
+
+          set_perm "$MODPATH/boot-completed.sh" 0 0 0755
+          set_perm_recursive "$MODPATH/bin" 0 0 0755 0755
+
+          mkdir -p "$HOME_DIR/.ssh" "$HOME_DIR/.local/bin"
+          chmod 700 "$HOME_DIR" "$HOME_DIR/.ssh"
+
+          if [ -f "$OLD_MOD/dropbear_ed25519_host_key" ]; then
+              cp -af "$OLD_MOD/dropbear_ed25519_host_key" "$MODPATH/"
+          elif [ -f "/data/adb/dropbear/dropbear_ed25519_host_key" ]; then
+              cp -af "/data/adb/dropbear/dropbear_ed25519_host_key" "$MODPATH/"
+          else
+              "$MODPATH/bin/dropbearkey" -t ed25519 -f "$MODPATH/dropbear_ed25519_host_key" >/dev/null 2>&1
+          fi
+          set_perm "$MODPATH/dropbear_ed25519_host_key" 0 0 0600
+          EOF
+
+          cat << 'EOF' > module/boot-completed.sh
+          #!/system/bin/sh
+          MODDIR=${0%/*}
+          exec "$MODDIR/bin/dropbear"
+          EOF
+
+          cd module && zip -r ../dropbear-ksu.zip .
+
+      - uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.target }}
-          path: output
-
-      - name: Upload build info as artifact
-        if: matrix.target == 'armv7a-linux-androideabi'
-        uses: actions/upload-artifact@v7
-        with:
-          name: buildinfo
-          path: buildinfo
-
-  release:
-    name: Release
-    runs-on: ubuntu-latest
-    needs: compile
-
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Fetch artifacts
-        uses: actions/download-artifact@v8
-
-      - name: Extract version to environment vars
-        run: |
-          echo "BUILD_RELEASE=$(cat buildinfo/release)" >> "$GITHUB_ENV"
-          echo "JAR_VERSION=$(cat buildinfo/release | \
-                sed 's/^DROPBEAR_//;s/p/-/')" >> "$GITHUB_ENV"
-
-      - name: Latest release tag name
-        id: latest_release
-        uses: actions/github-script@v9
-        with:
-          result-encoding: string
-          script: |
-            const query = `query release($owner:String!, $repo:String!) {
-              repository(owner:$owner, name:$repo) {
-                releases(first:1, orderBy:{field:CREATED_AT, direction:DESC}) {
-                  nodes {
-                    tagName
-                  }
-                }
-              }
-            }`
-            const vars = {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-            }
-            const result = await github.graphql(query, vars)
-            return result.repository.releases.nodes[0].tagName
-
-      - name: Package assets
-        run: |
-          zip --junk-paths dropbear-armv7a-linux-androideabi.zip \
-              armv7a-linux-androideabi/*
-          zip --junk-paths dropbear-aarch64-linux-android.zip \
-              aarch64-linux-android/*
-          zip --junk-paths dropbear-i686-linux-android.zip \
-              i686-linux-android/*
-          zip --junk-paths dropbear-x86_64-linux-android.zip \
-              x86_64-linux-android/*
-
-      - name: Setup Java
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: 11
-          cache: maven
-          server-id: central
-          server-username-env-var: MAVEN_CENTRAL_USERNAME
-          server-password-env-var: MAVEN_CENTRAL_PASSWORD
-
-      - name: Package JAR
-        run: |
-          copyarchbinaries() {
-            mkdir -p src/main/resources/lib/$2
-            cp -p $1/dropbear src/main/resources/lib/$2/libdropbear.so
-            cp -p $1/dbclient src/main/resources/lib/$2/libdbclient.so
-            cp -p $1/dropbearkey src/main/resources/lib/$2/libdropbearkey.so
-            cp -p $1/dropbearconvert \
-                  src/main/resources/lib/$2/libdropbearconvert.so
-            cp -p $1/scp src/main/resources/lib/$2/libscp.so
-          }
-
-          copyarchbinaries armv7a-linux-androideabi armeabi-v7a
-          copyarchbinaries aarch64-linux-android arm64-v8a
-          copyarchbinaries i686-linux-android x86
-          copyarchbinaries x86_64-linux-android x86_64
-
-          mkdir src/main/resources/META-INF
-          cp -p aarch64-linux-android/LICENSE.txt \
-                src/main/resources/META-INF/LICENSE
-
-          mvn --batch-mode versions:set -DnewVersion="${{ env.JAR_VERSION }}"
-          mvn --batch-mode package
-          cp target/android-dropbear-*.jar android-dropbear.jar
-
-      - name: Upload JAR as artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: jar
-          path: android-dropbear.jar
-
-      - name: Create release
-        if: >
-          env.BUILD_RELEASE != steps.latest_release.outputs.result &&
-          github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const fs = require('fs')
-            console.log("Creating release")
-
-            const release = await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: process.env.BUILD_RELEASE,
-              name: process.env.BUILD_RELEASE,
-              body: "Dropbear SSH binaries for Android API level " +
-                    fs.readFileSync("buildinfo/minsdk", "utf8").trimEnd() +
-                    " and above, built with NDK version " +
-                    fs.readFileSync("buildinfo/ndkver", "utf8").trimEnd() +
-                    " from " +
-                    fs.readFileSync("buildinfo/builtfrom", "utf8").trimEnd(),
-            })
-
-            const assets = [
-              'dropbear-armv7a-linux-androideabi.zip',
-              'dropbear-aarch64-linux-android.zip',
-              'dropbear-i686-linux-android.zip',
-              'dropbear-x86_64-linux-android.zip',
-              'android-dropbear.jar',
-            ]
-
-            for(const asset of assets) {
-              console.log("Uploading " + asset)
-              await github.rest.repos.uploadReleaseAsset({
-                headers: {
-                  "content-type": asset.endsWith(".jar") ?
-                    "application/java-archive" : "application/zip",
-                },
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                release_id: release.data.id,
-                data: fs.readFileSync(asset),
-                name: asset,
-              })
-            }
-
-      - name: Upload JAR to package registry
-        if: >
-          env.BUILD_RELEASE != steps.latest_release.outputs.result &&
-          github.event_name == 'push' && github.ref == 'refs/heads/master' &&
-          !contains(env.BUILD_RELEASE, 'pre')
-        run: mvn --batch-mode deploy -Dgpg.signer=bc
-        env:
-          MAVEN_GPG_KEY: ${{ secrets.GPG_SIGNING_KEY }}
-          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_SIGNING_PASSPHRASE }}
-          MAVEN_CENTRAL_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
-          MAVEN_CENTRAL_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          name: dropbear-ksu-module
+          path: dropbear-ksu.zip
+          archive: false
